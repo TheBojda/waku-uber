@@ -13,34 +13,13 @@
     "allowSyntheticDefaultImports": true,
     "sourceMap": true,
     "baseUrl": ".",
-    "types": [
-      "webpack-env"
-    ],
-    "paths": {
-      "@/*": [
-        "src/*"
-      ]
-    },
     "lib": [
       "esnext",
       "dom",
       "dom.iterable",
       "scripthost"
     ],
-    "typeRoots": [
-      "./types",
-      "./node_modules/@types"
-    ],
+    "strictPropertyInitialization": false,
     "noImplicitAny": false
-  },
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "src/**/*.vue",
-    "tests/**/*.ts",
-    "tests/**/*.tsx"
-, "src/utils/markers.js"  ],
-  "exclude": [
-    "node_modules"
-  ]
+  }
 }

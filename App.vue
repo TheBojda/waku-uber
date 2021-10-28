@@ -1,6 +1,7 @@
 <template>
   <div style="width: 100%; height: 100%">
     <GmapMap
+      ref="map"
       :center="{ lat: 45.508, lng: -73.587 }"
       :zoom="10"
       :options="{
@@ -29,16 +30,19 @@
         :opened="infoWindow.opened"
         @closeclick="infoWindow.opened = false"
       >
-        <b-container>
-          <b-row>
-            <b-col cols="3" style="padding-left: 0px; padding-right: 0px">
-              <b-img
-                rounded
+        <div class="container">
+          <div class="row">
+            <div
+              class="col col-3"
+              style="padding-left: 0px; padding-right: 0px"
+            >
+              <img
+                class="rounded"
                 :src="infoWindow.avatarData.thumbnailUrl"
                 style="width: 100%"
               />
-            </b-col>
-            <b-col cols="9">
+            </div>
+            <div class="col col-9">
               <strong>{{ infoWindow.avatarData.displayName }}</strong>
               <p>{{ infoWindow.avatarData.aboutMe }}</p>
               <p v-if="infoWindow.avatarData.phoneNumbers">
@@ -51,46 +55,44 @@
                   {{ infoWindow.avatarData.skype }}
                 </a>
               </p>
-            </b-col>
-          </b-row></b-container
-        >
+            </div>
+          </div>
+        </div>
       </GmapInfoWindow>
     </GmapMap>
     <div
       style="position: absolute; bottom: 30px; right: 20px"
       class="d-inline-flex flex-column"
     >
-      <b-button
-        size="lg"
-        pill
-        variant="dark"
-        class="mb-2"
-        v-b-modal="'profilePanel'"
-      >
-        <b-icon icon="person" aria-label="Set profile data"></b-icon>
-      </b-button>
-      <b-button
+      <button class="btn btn-lg btn-dark mb-2" @click="showProfilePanel">
+        <i class="bi-person"></i>
+      </button>
+      <button
         id="subscribe"
-        size="lg"
-        pill
-        variant="dark"
-        class="mb-2"
-        :pressed.sync="listeningToCalls"
+        class="btn btn-lg btn-dark mb-2"
+        :class="{ active: listeningToCalls }"
+        @click="listeningToCalls = !listeningToCalls"
       >
-        <b-icon icon="truck" aria-label="Share car"></b-icon>
-      </b-button>
-      <b-button size="lg" pill variant="dark" class="mb-2">
-        <b-icon icon="telephone" aria-label="Call car"></b-icon>
-      </b-button>
+        <i class="bi-truck"></i>
+      </button>
+      <button class="btn btn-lg btn-dark mb-2" @click="callCar">
+        <i class="bi-telephone"></i>
+      </button>
     </div>
-    <ProfilePanel />
+    <ProfilePanel ref="profilePanel" />
   </div>
 </template>
 
 <script lang="ts">
+import "babel-polyfill";
 import { Component, Vue } from "vue-property-decorator";
+import { Waku, WakuMessage } from "js-waku";
+import { GmapMap } from "vue2-google-maps";
 import { blackMarker, greenMarker } from "./utils/markers";
+import { proto } from "./utils/proto";
 import ProfilePanel from "./components/ProfilePanel.vue";
+
+const wakuTopicName = "/waku-uber/1/call-car/proto";
 
 @Component({
   components: {
@@ -105,10 +107,46 @@ export default class App extends Vue {
   public infoWindow = {
     position: { lat: 0, lng: 0 },
     opened: false,
-    avatarData: {},
+    avatarData: <any>{},
   };
 
   public listeningToCalls = false;
+
+  private waku: Waku;
+
+  constructor() {
+    super();
+    this.init();
+  }
+
+  private async init() {
+    this.waku = await Waku.create({ bootstrap: true });
+    await this.waku.waitForConnectedPeer();
+    console.log("Waku is initialized!");
+    this.waku.relay.addObserver(
+      (wakuMessage) => {
+        if (!wakuMessage.payload) return;
+        const decocded = proto.WakuUberMessage.decode(wakuMessage.payload);
+        console.log(decocded);
+      },
+      [wakuTopicName]
+    );
+  }
+
+  private async mounted() {
+    if (navigator.geolocation) {
+      const pos: any = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject);
+      });
+      this.myPosition = {
+        lat: pos?.coords.latitude,
+        lng: pos?.coords.longitude,
+      };
+      (this.$refs?.map as GmapMap).$mapPromise?.then((map) => {
+        map.panTo(this.myPosition);
+      });
+    }
+  }
 
   public blackMarkerClick() {
     let avatarData = localStorage.getItem("avatarData");
@@ -118,10 +156,27 @@ export default class App extends Vue {
       this.infoWindow.avatarData = JSON.parse(avatarData);
     }
   }
+
+  public showProfilePanel() {
+    (this.$refs.profilePanel as ProfilePanel).show();
+  }
+
+  public async callCar() {
+    let res = confirm("Would you like to call a car?");
+    if (res) {
+      const payload = proto.WakuUberMessage.encode({
+        type: proto.Type.REQUEST,
+        lat: this.myPosition.lat,
+        lng: this.myPosition.lng,
+      });
+      const wakuMessage = await WakuMessage.fromBytes(payload, wakuTopicName);
+      await this.waku.relay.send(wakuMessage);
+    }
+  }
 }
 </script>
 
-<style scoped>
+<style>
 #subscribe.active {
   background-color: #28a745;
   border-color: #28a745;
