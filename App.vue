@@ -221,6 +221,7 @@ export default class App extends Vue {
           broadcastTopicName
         );
         await this.waku.relay.send(wakuMessage);
+        console.log("Waku message sent!");
       } else {
         alert("Please setup your profile!");
       }
