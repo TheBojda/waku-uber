@@ -15,50 +15,39 @@
     >
       <GmapMarker
         :position="myPosition"
-        :icon="blackMarker"
+        :icon="myMarker"
         :draggable="true"
-        @click="blackMarkerClick"
+        @click="myMarkerClick"
+        @dragend="setMyPosition($event.latLng)"
       >
+        <InfoPanel ref="myInfoPanel" :position="myPosition" />
       </GmapMarker>
-      <!--GmapMarker
-        :position="{ lat: 45.5, lng: -73.58 }"
-        :icon="greenMarker"
-        :draggable="true"
-      /-->
-      <GmapInfoWindow
-        :position="infoWindow.position"
-        :opened="infoWindow.opened"
-        @closeclick="infoWindow.opened = false"
+      <GmapMarker
+        v-for="(incomingCall, idx) in incomingCalls"
+        :key="idx"
+        :position="{ lat: incomingCall.lat, lng: incomingCall.lng }"
+        :icon="incomingCallMarker"
+        @click="markerClick('ic-' + idx, incomingCall.avatarHash)"
       >
-        <div class="container">
-          <div class="row">
-            <div
-              class="col col-3"
-              style="padding-left: 0px; padding-right: 0px"
-            >
-              <img
-                class="rounded"
-                :src="infoWindow.avatarData.thumbnailUrl"
-                style="width: 100%"
-              />
-            </div>
-            <div class="col col-9">
-              <strong>{{ infoWindow.avatarData.displayName }}</strong>
-              <p>{{ infoWindow.avatarData.aboutMe }}</p>
-              <p v-if="infoWindow.avatarData.phoneNumbers">
-                <a :href="'tel:' + infoWindow.avatarData.phoneNumbers[0].value">
-                  {{ infoWindow.avatarData.phoneNumbers[0].value }}
-                </a>
-              </p>
-              <p v-if="infoWindow.avatarData.skype">
-                <a :href="'skype:' + infoWindow.avatarData.skype">
-                  {{ infoWindow.avatarData.skype }}
-                </a>
-              </p>
-            </div>
-          </div>
-        </div>
-      </GmapInfoWindow>
+        <InfoPanel
+          :ref="'ic-' + idx"
+          :position="{ lat: incomingCall.lat, lng: incomingCall.lng }"
+          :showOfferButton="true"
+          @makeOffer="makeAnOffer(incomingCall.avatarHash)"
+        />
+      </GmapMarker>
+      <GmapMarker
+        v-for="(incomingOffer, idx) in incomingOffers"
+        :key="idx"
+        :position="{ lat: incomingOffer.lat, lng: incomingOffer.lng }"
+        :icon="incomingOfferMarker"
+        @click="markerClick('io-' + idx, incomingOffer.avatarHash)"
+      >
+        <InfoPanel
+          :ref="'io-' + idx"
+          :position="{ lat: incomingOffer.lat, lng: incomingOffer.lng }"
+        />
+      </GmapMarker>
     </GmapMap>
     <div
       style="position: absolute; bottom: 30px; right: 20px"
@@ -71,7 +60,7 @@
         id="subscribe"
         class="btn btn-lg btn-dark mb-2"
         :class="{ active: listeningToCalls }"
-        @click="listeningToCalls = !listeningToCalls"
+        @click="changeSubscribeStatus"
       >
         <i class="bi-truck"></i>
       </button>
@@ -88,20 +77,24 @@ import "babel-polyfill";
 import { Component, Vue } from "vue-property-decorator";
 import { Waku, WakuMessage } from "js-waku";
 import { GmapMap } from "vue2-google-maps";
-import { blackMarker, greenMarker } from "./utils/markers";
+import { blackMarker, greenMarker, blueMarker } from "./utils/markers";
 import { proto } from "./utils/proto";
+import { fetchGrAvatarData } from "./utils/gravatar";
 import ProfilePanel from "./components/ProfilePanel.vue";
+import InfoPanel from "./components/InfoPanel.vue";
 
-const wakuTopicName = "/waku-uber/1/call-car/proto";
+const broadcastTopicName = "/waku-uber/1/broadcast/proto";
 
 @Component({
   components: {
     ProfilePanel,
+    InfoPanel,
   },
 })
 export default class App extends Vue {
-  public blackMarker = blackMarker;
-  public greenMarker = greenMarker;
+  public myMarker = blackMarker;
+  public incomingCallMarker = blueMarker;
+  public incomingOfferMarker = greenMarker;
 
   public myPosition = { lat: 45.508, lng: -73.587 };
   public infoWindow = {
@@ -111,8 +104,14 @@ export default class App extends Vue {
   };
 
   public listeningToCalls = false;
+  public incomingCalls = <any>[];
+  public incomingOffers = <any>[];
 
   private waku: Waku;
+
+  private broadcastOb = (wakuMessage) => {
+    this.processBroadcastMessages(wakuMessage);
+  };
 
   constructor() {
     super();
@@ -123,17 +122,25 @@ export default class App extends Vue {
     this.waku = await Waku.create({ bootstrap: true });
     await this.waku.waitForConnectedPeer();
     console.log("Waku is initialized!");
-    this.waku.relay.addObserver(
-      (wakuMessage) => {
-        if (!wakuMessage.payload) return;
-        const decocded = proto.WakuUberMessage.decode(wakuMessage.payload);
-        console.log(decocded);
-      },
-      [wakuTopicName]
-    );
+    this.initPrivateChannel();
   }
 
-  private async mounted() {
+  public async initPrivateChannel() {
+    let avatarData = localStorage.getItem("avatarData");
+    if (avatarData) {
+      let parsedAvatarData = JSON.parse(avatarData);
+      let privateTopicName = "/waku-uber/1/" + parsedAvatarData.hash + "/proto";
+      this.waku.relay.addObserver(
+        (wakuMessage) => {
+          this.processPrivateMessage(wakuMessage);
+        },
+        [privateTopicName]
+      );
+      console.log("Subscribed to private topic: " + privateTopicName);
+    }
+  }
+
+  public async mounted() {
     if (navigator.geolocation) {
       const pos: any = await new Promise((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject);
@@ -148,29 +155,99 @@ export default class App extends Vue {
     }
   }
 
-  public blackMarkerClick() {
+  public myMarkerClick() {
     let avatarData = localStorage.getItem("avatarData");
     if (avatarData) {
-      this.infoWindow.position = this.myPosition;
-      this.infoWindow.opened = true;
-      this.infoWindow.avatarData = JSON.parse(avatarData);
+      (this.$refs.myInfoPanel as InfoPanel).open(JSON.parse(avatarData));
     }
+  }
+
+  public setMyPosition(pos) {
+    this.myPosition = {
+      lat: pos.lat(),
+      lng: pos.lng(),
+    };
+  }
+
+  public async markerClick(refName, avatarHash) {
+    let infoPanelRefs: any = this.$refs[refName];
+    let avatarData = await fetchGrAvatarData(avatarHash);
+    (infoPanelRefs[0] as InfoPanel).open(avatarData);
   }
 
   public showProfilePanel() {
     (this.$refs.profilePanel as ProfilePanel).show();
   }
 
+  private processBroadcastMessages(wakuMessage) {
+    if (!wakuMessage.payload) return;
+    const decoded = proto.WakuUberMessage.decode(wakuMessage.payload);
+    console.log("broadcast", decoded);
+    this.incomingCalls.push(decoded);
+  }
+
+  private processPrivateMessage(wakuMessage) {
+    if (!wakuMessage.payload) return;
+    const decoded = proto.WakuUberMessage.decode(wakuMessage.payload);
+    console.log("private", decoded);
+    this.incomingOffers.push(decoded);
+  }
+
+  public changeSubscribeStatus() {
+    this.listeningToCalls = !this.listeningToCalls;
+    if (this.listeningToCalls) {
+      this.waku.relay.addObserver(this.broadcastOb, [broadcastTopicName]);
+      console.log("Subscribed to broadcast topic: " + broadcastTopicName);
+    } else {
+      this.waku.relay.deleteObserver(this.broadcastOb, [broadcastTopicName]);
+      console.log("Unsubscribed from broadcast topic: " + broadcastTopicName);
+    }
+  }
+
   public async callCar() {
     let res = confirm("Would you like to call a car?");
     if (res) {
-      const payload = proto.WakuUberMessage.encode({
-        type: proto.Type.REQUEST,
-        lat: this.myPosition.lat,
-        lng: this.myPosition.lng,
-      });
-      const wakuMessage = await WakuMessage.fromBytes(payload, wakuTopicName);
-      await this.waku.relay.send(wakuMessage);
+      let avatarData = localStorage.getItem("avatarData");
+      if (avatarData) {
+        let parsedAvatarData = JSON.parse(avatarData);
+        const payload = proto.WakuUberMessage.encode({
+          type: proto.Type.REQUEST,
+          lat: this.myPosition.lat,
+          lng: this.myPosition.lng,
+          avatarHash: parsedAvatarData.hash,
+        });
+        const wakuMessage = await WakuMessage.fromBytes(
+          payload,
+          broadcastTopicName
+        );
+        await this.waku.relay.send(wakuMessage);
+      } else {
+        alert("Please setup your profile!");
+      }
+    }
+  }
+
+  public async makeAnOffer(avatarHash) {
+    let res = confirm("Would you like to make an offer?");
+    if (res) {
+      let avatarData = localStorage.getItem("avatarData");
+      if (avatarData) {
+        let parsedAvatarData = JSON.parse(avatarData);
+        const payload = proto.WakuUberMessage.encode({
+          type: proto.Type.RESPONSE,
+          lat: this.myPosition.lat,
+          lng: this.myPosition.lng,
+          avatarHash: parsedAvatarData.hash,
+        });
+        let privateTopicName = "/waku-uber/1/" + avatarHash + "/proto";
+        const wakuMessage = await WakuMessage.fromBytes(
+          payload,
+          privateTopicName
+        );
+        await this.waku.relay.send(wakuMessage);
+      } else {
+        alert("Please setup your profile!");
+      }
     }
   }
 }

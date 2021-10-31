@@ -16,7 +16,17 @@ export const greenMarker = {
     path: pinSVGHole,
     anchor: { x: 12, y: 17 },
     fillOpacity: 1,
-    fillColor: "#28a745",
+    fillColor: "#00aa00",
+    strokeWeight: 2,
+    strokeColor: "white",
+    scale: 2,
+};
+
+export const blueMarker = {
+    path: pinSVGHole,
+    anchor: { x: 12, y: 17 },
+    fillOpacity: 1,
+    fillColor: "#0000aa",
     strokeWeight: 2,
     strokeColor: "white",
     scale: 2,

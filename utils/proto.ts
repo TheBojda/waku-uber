@@ -10,5 +10,6 @@ message WakuUberMessage {
     Type type = 1;
     float lat = 2;
     float lng = 3;
+    string avatarHash = 4;
 }
 `);
