@@ -11285,8 +11285,8 @@ textarea.form-control-lg {
 
 @font-face {
   font-family: "bootstrap-icons";
-  src: url("/bootstrap-icons.1dc80094.woff2?757e8d3807317fad54e5811fd78f18c8") format("woff2"),
-url("/bootstrap-icons.3b28d689.woff?757e8d3807317fad54e5811fd78f18c8") format("woff");
+  src: url("./bootstrap-icons.1dc80094.woff2?757e8d3807317fad54e5811fd78f18c8") format("woff2"),
+url("./bootstrap-icons.3b28d689.woff?757e8d3807317fad54e5811fd78f18c8") format("woff");
 }
 
 .bi::before,
