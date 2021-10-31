@@ -2,7 +2,8 @@
 
 Uber like minimalistic car sharing app using js-waku and Vue.js
 
-## Start locally 
+## Start locally
+- Rename config.template.json to config.json, and set yout Google Maps API key 
 - **npm update**
 - **npm start**
 - Open http://localhost:1234 in your browser
