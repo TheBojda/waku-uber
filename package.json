@@ -27,7 +27,7 @@
     "bootstrap-icons": "^1.6.1",
     "fetch-jsonp": "^1.2.1",
     "geolocation-utils": "^1.2.5",
-    "js-waku": "^0.13.1",
+    "js-waku": "^0.14.2-rc.0",
     "md5": "^2.3.0",
     "protons": "^2.0.3",
     "tslib": "^2.3.1",
