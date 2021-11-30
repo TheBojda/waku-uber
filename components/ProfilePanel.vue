@@ -65,7 +65,7 @@ import { fetchGrAvatarData } from "../utils/gravatar";
 import { Modal } from "bootstrap";
 
 @Component
-export default class ProfilePanel extends Vue {
+class ProfilePanel extends Vue {
   public gravatar: any = false;
   public email = "";
 
@@ -87,6 +87,8 @@ export default class ProfilePanel extends Vue {
     modal.show();
   }
 }
+
+export default ProfilePanel;
 </script>
 
 <style scoped>

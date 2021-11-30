@@ -91,7 +91,7 @@ const broadcastTopicName = "/waku-uber/1/broadcast/proto";
     InfoPanel,
   },
 })
-export default class App extends Vue {
+class App extends Vue {
   public myMarker = blackMarker;
   public incomingCallMarker = blueMarker;
   public incomingOfferMarker = greenMarker;
@@ -252,6 +252,8 @@ export default class App extends Vue {
     }
   }
 }
+
+export default App;
 </script>
 
 <style>
