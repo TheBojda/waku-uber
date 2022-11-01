@@ -13,6 +13,12 @@ Uber like minimalistic car sharing app using js-waku and Vue.js
 - Call yourself from the other tab using the phone button
 - When you see yourself in the first tab, click on the marker, and click on 'Make an offer' button
 
-## Read my HackerNoon article
+## Read my article
+
+on HackerNoon
 
 https://hackernoon.com/decentralized-uber-heres-how-i-built-it-with-statusim-waku-and-vuejs
+
+on Medium
+
+https://javascript.plainenglish.io/decentralized-uber-heres-how-i-built-it-with-status-im-waku-and-vue-js-719b0b998387
